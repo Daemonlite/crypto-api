@@ -1,7 +1,9 @@
 from django.db import models
 from crypto.caches import Cache
 from decimal import Decimal
+
 # Create your models here.
+
 
 class Coin(models.Model):
     network = models.CharField(max_length=10, blank=True, null=True)
@@ -30,7 +32,7 @@ class Coin(models.Model):
 
     def fetch_coins(self):
         return Cache(Coin, "cache_coins").fetch_values()
-    
+
 
 class Countries(models.Model):
     name = models.CharField(max_length=120, blank=True, null=True)
@@ -65,7 +67,7 @@ class Countries(models.Model):
                 return country[0]
             return None
         return Cache(Countries, "cache_countries").fetch_values()
-    
+
 
 class Rates(models.Model):
     """meant for setting country specific rates for each coin"""

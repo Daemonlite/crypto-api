@@ -6,8 +6,18 @@ django.setup()
 
 
 from crypto.utils import CoinManager
+
 mana = CoinManager()
-fee = mana.calculate_usd_value(0.08288019, 'ethereum')
+# fee = mana.coin_market_rates()
 
-print(fee)
 
+# print(fee.get('ethereum'))
+
+from_ = "bc1q8pmuc2v0cku2ty0rfxp2jyvrhv6lpsjzq9y6s8"
+my = "bc1q4c9hxh36ew6v7yzfflwm03kkc0shcensdz7dzs"
+
+
+if my == from_:
+    print("yes")
+else:
+    print("no")

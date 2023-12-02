@@ -6,6 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class Cache:
     def __init__(self, cls, template):
         self.cls = cls
