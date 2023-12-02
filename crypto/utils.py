@@ -1,4 +1,6 @@
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
+import arrow
+from datetime import datetime
 from decouple import config
 import json
 from crypto.models import Coin, Countries
@@ -162,7 +164,8 @@ class CoinManager:
                             if sent_or_received == "Received"
                             else transaction["inputs"][0]["prev_out"]["addr"]
                         )
-
+                        timestamp = int(transaction["time"])
+                        date_object = datetime.fromtimestamp(timestamp)
                         transaction_info = {
                             "tx_id": tx_id,
                             "type": sent_or_received,
@@ -171,6 +174,7 @@ class CoinManager:
                             "amount_usd": self.calculate_usd_value(
                                 amount_btc, "bitcoin"
                             ),
+                            "date": arrow.get(date_object).format("YYYY-MM-DD"),
                         }
 
                         result.append(transaction_info)
@@ -216,6 +220,10 @@ class CoinManager:
                             else:
                                 addr = transaction["to"]
 
+                            # Convert Unix timestamp to datetime
+                            timestamp = int(transaction["timeStamp"])
+                            date_object = datetime.utcfromtimestamp(timestamp)
+
                             transaction_info = {
                                 "tx_id": tx_id,
                                 "type": sent_or_received,
@@ -226,6 +234,7 @@ class CoinManager:
                                 "amount_usd": self.calculate_usd_value(
                                     amount_eth, "ethereum"
                                 ),
+                                "date": date_object.date(),  # Extract the date from the datetime object
                             }
 
                             result.append(transaction_info)

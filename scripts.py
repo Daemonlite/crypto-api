@@ -13,11 +13,5 @@ mana = CoinManager()
 
 # print(fee.get('ethereum'))
 
-from_ = "bc1q8pmuc2v0cku2ty0rfxp2jyvrhv6lpsjzq9y6s8"
+eth = "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe51"
 my = "bc1q4c9hxh36ew6v7yzfflwm03kkc0shcensdz7dzs"
-
-
-if my == from_:
-    print("yes")
-else:
-    print("no")
