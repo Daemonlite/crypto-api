@@ -7,7 +7,7 @@ django.setup()
 
 from crypto.utils import CoinManager
 mana = CoinManager()
-fee = mana.get_coin_price('bitcoin')
+fee = mana.calculate_usd_value(0.08288019, 'ethereum')
 
 print(fee)
 

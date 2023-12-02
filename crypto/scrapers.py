@@ -8,7 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def scrape_fees():
+def bitcoin_fee():
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
 
