@@ -74,6 +74,13 @@ WSGI_APPLICATION = "digest.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
+    }
+}
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

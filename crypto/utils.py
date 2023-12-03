@@ -3,7 +3,6 @@ import arrow
 from datetime import datetime
 from decouple import config
 import json
-from crypto.models import Coin, Countries
 from django.http import JsonResponse
 import requests
 from django.core.cache import cache
@@ -11,43 +10,99 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+"""
+1. add endpoint for adding coins
+2. add a method for checking balance on coin
+3.
+"""
+
 
 class CoinManager:
-    # symbol egs btc for bitcoin
-    def add_coin(
-        self, network, lable, stable, current_price, coin, symbol, image, enabled
-    ):
-        try:
-            coin = Coin.objects.create(
-                network=network,
-                label=lable,
-                stable=stable,
-                current_price=current_price,
-                coin=coin,
-                symbol=symbol,
-                image=image,
-                enabled=enabled,
-            )
-            if coin:
-                return JsonResponse({"success": True, "info": "Coin added"})
-            else:
-                return JsonResponse({"success": False, "info": "Unable to add coin"})
-        except Exception as e:
-            logger.warning(str(e))
-            return JsonResponse({"success": False, "info": "An error ocurred"})
+    def check_balance(self, coin, address):
+        if coin == "bitcoin":
+            api_url = f"https://blockstream.info/api/address/{address}"
 
-    def add_country(self, name, code, currency):
-        try:
-            country = Countries.objects.create(
-                name=name, short_code=code, currency=currency
-            )
-            if country:
-                return JsonResponse({"success": True, "info": "country added"})
-            else:
-                return JsonResponse({"success": False, "info": "Unable to add country"})
-        except Exception as e:
-            logger.warning(str(e))
-            return JsonResponse({"success": False, "info": "An error ocurred"})
+            try:
+                response = requests.get(api_url)
+                response.raise_for_status()
+
+                data = response.json()
+                balance = (
+                    data["chain_stats"]["funded_txo_sum"] / 10**8
+                )  # Convert satoshis to BTC
+                usd_balance = self.calculate_usd_value(balance, "bitcoin")
+
+                if balance and usd_balance:
+                    return JsonResponse(
+                        {"crypto_balance": balance, "usd_balance": usd_balance}
+                    )
+            except Exception as e:
+                logger.warning(f"Error: {str(e)}")
+                return JsonResponse({"success": False, "info": "Failed to get balance"})
+
+        elif coin == "ethereum":
+            ETHERSCAN_API_KEY = config("ETHERSCAN_API_KEY")
+            api_url = f"https://api.etherscan.io/api?module=account&action=balance&address={address}&apikey={ETHERSCAN_API_KEY}"
+
+            try:
+                response = requests.get(api_url)
+                response.raise_for_status()
+
+                data = response.json()
+                balance_wei = Decimal(data["result"])
+                balance_eth = balance_wei / Decimal(10**18)  # Convert Wei to Ether
+                crypto_balance = balance_eth.quantize(
+                    Decimal("0.00000000"), rounding=ROUND_HALF_UP
+                )
+                usd_balance = self.calculate_usd_value(crypto_balance, "ethereum")
+
+                return JsonResponse(
+                    {"crypto_balance": crypto_balance, "usd_balance": usd_balance}
+                )
+            except requests.exceptions.RequestException as e:
+                print(f"Error checking Ethereum balance: {e}")
+                return None
+
+        elif coin == "ripple":
+            url = f"https://api.tatum.io/v3/xrp/account/{address}/balance/"
+
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+
+                data = response.json()
+                balance = Decimal(data["balance"]) / Decimal("1000000")
+                crypto_balance = balance
+                usd_balance = self.calculate_usd_value(crypto_balance, "ripple")
+
+                return JsonResponse(
+                    {"crypto_balance": crypto_balance, "usd_balance": usd_balance}
+                )
+
+            except requests.exceptions.RequestException as e:
+                print(f"Error checking Litecoin balance: {e}")
+                return None
+
+        elif coin == "litecoin":
+            url = f"https://coinremitter.com/api/v3/LTC/get-balance"
+
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+
+                data = response.json()
+
+                if data["flag"] == 1:
+                    balance = Decimal(data["data"]["balance"])
+                    return balance.quantize(
+                        Decimal("0.00000000"), rounding=ROUND_HALF_UP
+                    )
+                else:
+                    print(f"Failed to get Litecoin balance. Message: {data['msg']}")
+                    return None
+            except requests.exceptions.RequestException as e:
+                print(f"Error checking Litecoin balance: {e}")
+                return None
 
     def get_coin_price(self, coin):
         try:
@@ -96,6 +151,26 @@ class CoinManager:
         )
         return usd_amount
 
+    def fetch_coin_rates_local_equivalent(self, coin, currency):
+        try:
+            usd = self.get_coin_price(coin)
+            if usd is None:
+                raise Exception(f"Exchange rate for {coin} not found in the database")
+            rate = Decimal(usd)
+            local_equivalent = self.convert_currency(currency, rate)
+
+            if local_equivalent:
+                return JsonResponse({"success": True, "info": local_equivalent})
+            else:
+                return JsonResponse(
+                    {"success": False, "info": "Unable to fetch local equivalent"}
+                )
+        except Exception as e:
+            logger.warning(f"Error: {str(e)}")
+            return JsonResponse(
+                {"success": False, "info": "Unable to fetch local equivalent"}
+            )
+
     def transaction_checker(self, coin, address):
         try:
             SATOSHIS_PER_BITCOIN = 100000000
@@ -141,6 +216,7 @@ class CoinManager:
 
                     if result:
                         return JsonResponse({"success": True, "data": result})
+
                     else:
                         return JsonResponse(
                             {"success": False, "info": "No transactions found"}
@@ -170,7 +246,9 @@ class CoinManager:
                             else:
                                 sent_or_received = "Received"
 
-                            amount_eth = Decimal(transaction["value"]) / Decimal("1000000000000000000")
+                            amount_eth = Decimal(transaction["value"]) / Decimal(
+                                "1000000000000000000"
+                            )
                             if sent_or_received == "Received":
                                 addr = transaction["from"]
                             else:
@@ -183,7 +261,9 @@ class CoinManager:
                                 "tx_id": tx_id,
                                 "type": sent_or_received,
                                 "address": addr,
-                                "amount_eth": amount_eth.quantize(Decimal("0.00000000"), rounding=ROUND_HALF_UP),
+                                "amount_eth": amount_eth.quantize(
+                                    Decimal("0.00000000"), rounding=ROUND_HALF_UP
+                                ),
                                 "amount_usd": usd,
                                 "date": date_object.date(),
                             }
@@ -218,8 +298,19 @@ class CoinManager:
                         result = []
                         for transaction in transactions:
                             tx_id = transaction.get("txid")
-                            sent_or_received = "Sent" if transaction.get("vin")[0]["prevout"]["scriptpubkey_address"] == address else "Received"
-                            amount_ltc = Decimal(transaction.get("vout")[0]["value"]) / Decimal("100000000")  # LTC has 8 decimals
+                            sent_or_received = (
+                                "Sent"
+                                if transaction.get("vin")[0]["prevout"][
+                                    "scriptpubkey_address"
+                                ]
+                                == address
+                                else "Received"
+                            )
+                            amount_ltc = Decimal(
+                                transaction.get("vout")[0]["value"]
+                            ) / Decimal(
+                                "100000000"
+                            )  # LTC has 8 decimals
                             usd = self.calculate_usd_value(amount_ltc, "litecoin")
                             addr = transaction.get("vout")[0]["scriptpubkey_address"]
                             timestamp = int(transaction["status"]["block_time"])
@@ -229,7 +320,9 @@ class CoinManager:
                                 "tx_id": tx_id,
                                 "type": sent_or_received,
                                 "address": addr,
-                                "amount_ltc": amount_ltc.quantize(Decimal("0.00000000"), rounding=ROUND_HALF_UP),
+                                "amount_ltc": amount_ltc.quantize(
+                                    Decimal("0.00000000"), rounding=ROUND_HALF_UP
+                                ),
                                 "amount_usd": usd,
                                 "date": date_object.date(),
                             }
@@ -244,7 +337,10 @@ class CoinManager:
                             )
                     else:
                         return JsonResponse(
-                            {"success": False, "info": "Error: No transaction data found"}
+                            {
+                                "success": False,
+                                "info": "Error: No transaction data found",
+                            }
                         )
                 except Exception as e:
                     logger.warning(str(e))
@@ -264,20 +360,32 @@ class CoinManager:
                         result = []
                         for transaction in transactions:
                             tx_id = transaction.get("hash")
-                            sent_or_received = "Received" if transaction["Destination"] == address else "Sent"
-                            amount_xrp = Decimal(transaction["Amount"]["value"]) / Decimal("1000000")  # XRP has 6 decimals
+                            sent_or_received = (
+                                "Received"
+                                if transaction["Destination"] == address
+                                else "Sent"
+                            )
+                            amount_xrp = Decimal(
+                                transaction["Amount"]["value"]
+                            ) / Decimal(
+                                "1000000"
+                            )  # XRP has 6 decimals
                             usd = self.calculate_usd_value(amount_xrp, "ripple")
                             if sent_or_received == "Sent":
                                 addr = transaction["Destination"]
                             else:
                                 addr = transaction["Account"]
-                            timestamp = datetime.strptime(transaction.get("date"), "%Y-%m-%dT%H:%M:%S.%fZ")
+                            timestamp = datetime.strptime(
+                                transaction.get("date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                            )
 
                             transaction_info = {
                                 "tx_id": tx_id,
                                 "type": sent_or_received,
                                 "address": addr,
-                                "amount_xrp": amount_xrp.quantize(Decimal("0.000000"), rounding=ROUND_HALF_UP),
+                                "amount_xrp": amount_xrp.quantize(
+                                    Decimal("0.000000"), rounding=ROUND_HALF_UP
+                                ),
                                 "amount_usd": usd,
                                 "date": timestamp.date(),
                             }
@@ -292,7 +400,10 @@ class CoinManager:
                             )
                     else:
                         return JsonResponse(
-                            {"success": False, "info": "Error: No transaction data found"}
+                            {
+                                "success": False,
+                                "info": "Error: No transaction data found",
+                            }
                         )
                 except Exception as e:
                     logger.warning(str(e))
@@ -301,4 +412,3 @@ class CoinManager:
         except Exception as e:
             logger.warning(str(e))
             return JsonResponse({"success": False, "info": "An error ocurred"})
-
