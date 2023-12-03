@@ -147,7 +147,7 @@ class CoinManager:
                 data = response.json()
 
                 if "txs" in data:
-                    transactions = data["txs"][:5]  # Get the last 5 transactions
+                    transactions = data["txs"]
 
                     result = []
                     for transaction in transactions:
@@ -171,9 +171,9 @@ class CoinManager:
                             "type": sent_or_received,
                             "address": addr,
                             "amount_btc": amount_btc,
-                            "amount_usd": self.calculate_usd_value(
-                                amount_btc, "bitcoin"
-                            ),
+                            # "amount_usd": self.calculate_usd_value(
+                            #     amount_btc, "bitcoin"
+                            # ),
                             "date": arrow.get(date_object).format("YYYY-MM-DD"),
                         }
 
@@ -202,7 +202,7 @@ class CoinManager:
                     data = response.json()
 
                     if data["status"] == "1":
-                        transactions = data["result"][:5]  # Get the last 5 transactions
+                        transactions = data["result"]
 
                         result = []
                         for transaction in transactions:
@@ -231,9 +231,9 @@ class CoinManager:
                                 "amount_eth": amount_eth.quantize(
                                     Decimal("0.00000000"), rounding=ROUND_HALF_UP
                                 ),
-                                "amount_usd": self.calculate_usd_value(
-                                    amount_eth, "ethereum"
-                                ),
+                                # "amount_usd": self.calculate_usd_value(
+                                #     amount_eth, "ethereum"
+                                # ),
                                 "date": date_object.date(),  # Extract the date from the datetime object
                             }
 
@@ -242,9 +242,13 @@ class CoinManager:
                         if result:
                             return JsonResponse({"success": True, "data": result})
                         else:
-                            return {"success": False, "info": "No transactions found"}
+                            return JsonResponse(
+                                {"success": False, "info": "No transactions found"}
+                            )
                     else:
-                        return {"success": False, "info": f"Error: {data['message']}"}
+                        return JsonResponse(
+                            {"success": False, "info": f"Error: {data['message']}"}
+                        )
                 except Exception as e:
                     logger.warning(str(e))
                     return JsonResponse({"success": False, "info": "An error ocurred"})
@@ -252,3 +256,128 @@ class CoinManager:
         except Exception as e:
             logger.warning(str(e))
             return JsonResponse({"success": False, "info": "An error ocurred"})
+
+    def fetch_ltc_xrp_transactions(self, coin, address):
+        if coin == "ltc" or coin == "litecoin":
+            url = f"https://litecoinspace.org/api/address/{address}/txs"
+
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+
+                data = response.json()
+
+                if data:
+                    transactions = data
+
+                    result = []
+                    for transaction in transactions:
+                        tx_id = transaction.get("txid")
+                        sent_or_received = (
+                            "Sent"
+                            if transaction.get("vin")[0]["prevout"][
+                                "scriptpubkey_address"
+                            ]
+                            == address
+                            else "Received"
+                        )
+                        amount_ltc = Decimal(
+                            transaction.get("vout")[0]["value"]
+                        ) / Decimal(
+                            "100000000"
+                        )  # LTC has 8 decimals
+                        addr = transaction.get("vout")[0]["scriptpubkey_address"]
+
+                        # Convert Unix timestamp to datetime
+                        timestamp = int(transaction["status"]["block_time"])
+                        date_object = datetime.utcfromtimestamp(timestamp)
+
+                        transaction_info = {
+                            "tx_id": tx_id,
+                            "type": sent_or_received,
+                            "address": addr,
+                            "amount_ltc": amount_ltc.quantize(
+                                Decimal("0.00000000"), rounding=ROUND_HALF_UP
+                            ),
+                            "date": date_object.date(),
+                        }
+
+                        result.append(transaction_info)
+
+                    if result:
+                        return JsonResponse({"success": True, "data": result})
+                    else:
+                        return JsonResponse(
+                            {"success": False, "info": "No transactions found"}
+                        )
+                else:
+                    return JsonResponse(
+                        {"success": False, "info": "Error: No transaction data found"}
+                    )
+            except Exception as e:
+                logger.warning(str(e))
+                return JsonResponse({"success": False, "info": "An error occurred"})
+
+        if coin == "xrp" or coin == "ripple":
+            # XRPScan API URL for XRP transactions
+            url = f"https://api.xrpscan.com/api/v1/account/{address}/transactions"
+
+            try:
+                # Make a GET request to the XRPScan API
+                response = requests.get(url)
+                response.raise_for_status()  # Check if the request was successful (status code 200)
+
+                # Parse the JSON response
+                data = response.json()
+
+                # Check if the API response indicates success
+                if data.get("transactions"):
+                    transactions = data["transactions"]
+
+                    result = []
+                    for transaction in transactions:
+                        tx_id = transaction.get("hash")
+                        sent_or_received = (
+                            "Received"
+                            if transaction["Destination"] == address
+                            else "Sent"
+                        )
+                        amount_xrp = Decimal(transaction["Amount"]["value"]) / Decimal(
+                            "1000000"
+                        )  # XRP has 6 decimals
+                        if sent_or_received == "Sent":
+                            addr = transaction["Destination"]
+                        else:
+                            addr = transaction["Account"]
+                        # Convert timestamp to datetime
+                        timestamp = datetime.strptime(
+                            transaction.get("date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                        )
+
+                        transaction_info = {
+                            "tx_id": tx_id,
+                            "type": sent_or_received,
+                            "address": addr,
+                            "amount_xrp": amount_xrp.quantize(
+                                Decimal("0.000000"), rounding=ROUND_HALF_UP
+                            ),
+                            "date": timestamp.date(),
+                        }
+
+                        result.append(transaction_info)
+
+                    if result:
+                        return JsonResponse({"success": True, "data": result})
+                    else:
+                        return JsonResponse(
+                            {"success": False, "info": "No transactions found"}
+                        )
+                else:
+                    # Provide more detailed information about the error
+                    return JsonResponse(
+                        {"success": False, "info": "Error: No transaction data found"}
+                    )
+            except Exception as e:
+                # Handle exceptions and log warnings
+                logger.warning(str(e))
+                return JsonResponse({"success": False, "info": "An error occurred"})
