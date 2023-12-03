@@ -64,44 +64,6 @@ class CoinManager:
                 {"success": False, "info": "Failed to get exchange rate"}
             )
 
-    def coin_market_rates(self):
-        try:
-            # Make a request to the CoinGecko API to get coin data in USD
-            url = "https://api.coingecko.com/api/v3/coins/markets"
-            params = {
-                "vs_currency": "usd",
-                "order": "market_cap_desc",
-                "per_page": 200,
-                "page": 1,
-                "sparkline": False,
-            }
-            supported_coins = [
-                "btc",
-                "usdt",
-                "ltc",
-                "bch",
-                "eth",
-                "xrp",
-                "dash",
-                "usdc",
-                "tusd",
-            ]
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            coin_data = response.json()
-
-            # Filter the coin data based on supported symbols
-            coins = [
-                (coin["id"], coin["current_price"])
-                for coin in coin_data
-                if coin["symbol"] in supported_coins
-            ]
-            return coins
-
-        except Exception as e:
-            logger.warning(str(e))
-            return {}
-
     def convert_currency(self, to, amount):
         url = f"https://api.apilayer.com/fixer/convert?to={to}&from=USD&amount={amount}"
         payload = {}
@@ -115,8 +77,7 @@ class CoinManager:
         return form
 
     def calculate_crypto_value(self, amount_usd, coin):
-        rates = dict(self.coin_market_rates())
-        usd = rates.get(coin)
+        usd = self.get_coin_price(coin)
         if usd is None:
             raise Exception(f"Exchange rate for {coin} not found in the database")
         rate = Decimal(usd)
@@ -126,8 +87,7 @@ class CoinManager:
         return crypto_value
 
     def calculate_usd_value(self, crypto_value, coin):
-        rates = dict(self.coin_market_rates())
-        usd = rates.get(coin)
+        usd = self.get_coin_price(coin)
         if usd is None:
             raise Exception(f"Exchange rate for {coin} not found in the database")
         rate = Decimal(usd)
@@ -164,6 +124,9 @@ class CoinManager:
                             if sent_or_received == "Received"
                             else transaction["inputs"][0]["prev_out"]["addr"]
                         )
+                        usd = self.calculate_usd_value(
+                                amount_btc, "bitcoin"
+                            ),
                         timestamp = int(transaction["time"])
                         date_object = datetime.fromtimestamp(timestamp)
                         transaction_info = {
@@ -171,9 +134,7 @@ class CoinManager:
                             "type": sent_or_received,
                             "address": addr,
                             "amount_btc": amount_btc,
-                            # "amount_usd": self.calculate_usd_value(
-                            #     amount_btc, "bitcoin"
-                            # ),
+                            "amount_usd": usd,
                             "date": arrow.get(date_object).format("YYYY-MM-DD"),
                         }
 
@@ -219,7 +180,9 @@ class CoinManager:
                                 addr = transaction["from"]
                             else:
                                 addr = transaction["to"]
-
+                            usd = self.calculate_usd_value(
+                                    amount_eth, "ethereum"
+                                )
                             # Convert Unix timestamp to datetime
                             timestamp = int(transaction["timeStamp"])
                             date_object = datetime.utcfromtimestamp(timestamp)
@@ -231,9 +194,7 @@ class CoinManager:
                                 "amount_eth": amount_eth.quantize(
                                     Decimal("0.00000000"), rounding=ROUND_HALF_UP
                                 ),
-                                # "amount_usd": self.calculate_usd_value(
-                                #     amount_eth, "ethereum"
-                                # ),
+                                "amount_usd": usd,
                                 "date": date_object.date(),  # Extract the date from the datetime object
                             }
 
@@ -260,16 +221,16 @@ class CoinManager:
     def fetch_ltc_xrp_transactions(self, coin, address):
         if coin == "ltc" or coin == "litecoin":
             url = f"https://litecoinspace.org/api/address/{address}/txs"
-
+    
             try:
                 response = requests.get(url)
                 response.raise_for_status()
-
+    
                 data = response.json()
-
+    
                 if data:
                     transactions = data
-
+    
                     result = []
                     for transaction in transactions:
                         tx_id = transaction.get("txid")
@@ -286,12 +247,16 @@ class CoinManager:
                         ) / Decimal(
                             "100000000"
                         )  # LTC has 8 decimals
+                        
+                        # Calculate USD value
+                        usd = self.calculate_usd_value(amount_ltc, "litecoin")
+                        
                         addr = transaction.get("vout")[0]["scriptpubkey_address"]
-
+                        
                         # Convert Unix timestamp to datetime
                         timestamp = int(transaction["status"]["block_time"])
                         date_object = datetime.utcfromtimestamp(timestamp)
-
+    
                         transaction_info = {
                             "tx_id": tx_id,
                             "type": sent_or_received,
@@ -299,11 +264,12 @@ class CoinManager:
                             "amount_ltc": amount_ltc.quantize(
                                 Decimal("0.00000000"), rounding=ROUND_HALF_UP
                             ),
+                            "amount_usd": usd,  # Updated field
                             "date": date_object.date(),
                         }
-
+    
                         result.append(transaction_info)
-
+    
                     if result:
                         return JsonResponse({"success": True, "data": result})
                     else:
@@ -345,6 +311,7 @@ class CoinManager:
                         amount_xrp = Decimal(transaction["Amount"]["value"]) / Decimal(
                             "1000000"
                         )  # XRP has 6 decimals
+                        usd = self.calculate_usd_value(amount_xrp,"ripple")
                         if sent_or_received == "Sent":
                             addr = transaction["Destination"]
                         else:
@@ -361,6 +328,7 @@ class CoinManager:
                             "amount_xrp": amount_xrp.quantize(
                                 Decimal("0.000000"), rounding=ROUND_HALF_UP
                             ),
+                            "amount_usd":usd,
                             "date": timestamp.date(),
                         }
 

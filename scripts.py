@@ -14,22 +14,11 @@ mana = CoinManager()
 
 # print(fee.get('ethereum'))
 
-eth = "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe51"
-my = "bc1q4c9hxh36ew6v7yzfflwm03kkc0shcensdz7dzs"
+eth = "0x32bd825f30BA59234c9c3620237f0b14249B109F"
+btc= "bc1q4c9hxh36ew6v7yzfflwm03kkc0shcensdz7dzs"
+ltc = 'ltc1q7v25d7g2gh0t803tj2u8qy34erl8w92px4ec6e'
+xrp = 'rP3Lp2yJvFQpJtCv3dLq5rJkLqjHt3p5z'
 
+pr = mana.get_coin_price('eth')
 
-url = "https://api.omniexplorer.info/v1/transaction/address"
-
-# Define the form data parameters
-data = {"addr": "TRigm6gS7zPntaYBf9N2HoFm2snGaeSpgw", "page": 0}
-
-# Make a POST request to the API
-response = requests.post(
-    url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}
-)
-response.raise_for_status()  # Check if the request was successful (status code 200)
-
-# Parse the JSON response
-data = response.json()
-
-print(data)
+print(pr)
