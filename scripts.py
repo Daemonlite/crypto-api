@@ -17,7 +17,7 @@ mana = CoinManager()
 eth = "0x32bd825f30BA59234c9c3620237f0b14249B109F"
 btc= "bc1q4c9hxh36ew6v7yzfflwm03kkc0shcensdz7dzs"
 ltc = 'ltc1q7v25d7g2gh0t803tj2u8qy34erl8w92px4ec6e'
-xrp = 'rP3Lp2yJvFQpJtCv3dLq5rJkLqjHt3p5z'
+xrp = 'rBURNERRhpAM8ygERz7GsXrHRjJrngBLi2'
 
 pr = mana.get_coin_price('eth')
 

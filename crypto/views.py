@@ -12,26 +12,12 @@ manage = CoinManager()
 
 
 @csrf_exempt
-def get_latest_transactions(request):
+def get_wallet_transactions(request):
     try:
         data = json.loads(request.body)
         address = data.get("address")
         coin = data.get("coin")
-        man = manage.fetch_latest_transactions(coin, address)
-        return man
-
-    except Exception as e:
-        logger.warning(str(e))
-        return JsonResponse({"success": False, "info": "Unable to fetch request data"})
-
-
-@csrf_exempt
-def get_lc_transactions(request):
-    try:
-        data = json.loads(request.body)
-        address = data.get("address")
-        coin = data.get("coin")
-        man = manage.fetch_ltc_xrp_transactions(coin, address)
+        man = manage.transaction_checker(coin, address)
         return man
 
     except Exception as e:
