@@ -5,19 +5,116 @@ from decouple import config
 import json
 from django.http import JsonResponse
 import requests
-from django.core.cache import cache
+from crypto.models import Coin, Profile, WalletAddress
 import logging
 
 logger = logging.getLogger(__name__)
 
-"""
-1. add endpoint for adding coins
-2. add a method for checking balance on coin
-3.
-"""
-
 
 class CoinManager:
+    def add_coin(request, user_id, coin):
+        try:
+            # Retrieve the user (Profile) based on user_id
+            holder = Profile.objects.get(uid=user_id)
+
+            # Check if the user exists
+            if not holder:
+                return JsonResponse({"success": False, "info": "User does not exist"})
+
+            # Check if the provided coin is supported
+            supported_coins = ["bitcoin", "litecoin", "ethereum", "ripple"]
+            if coin not in supported_coins:
+                return JsonResponse({"success": False, "info": "Coin not supported"})
+
+            # Map coin to symbol
+            coin_symbol_mapping = {
+                "bitcoin": "BTC",
+                "litecoin": "LTC",
+                "ethereum": "ETH",
+                "ripple": "XRP",
+            }
+            symbol = coin_symbol_mapping.get(coin, "")
+
+            # Create a new Coin instance
+            new_coin = Coin.objects.create(holder=holder, name=coin, symbol=symbol)
+
+            # Check if the coin was successfully added
+            if new_coin:
+                return JsonResponse({"success": True, "info": "Coin added"})
+            else:
+                return JsonResponse({"success": False, "info": "Failed to add coin"})
+
+        except Profile.DoesNotExist:
+            return JsonResponse({"success": False, "info": "User does not exist"})
+        except Exception as e:
+            logger.warning(str(e))
+            return JsonResponse({"success": False, "info": "Failed to add coin"})
+
+    def get_coins(self, user_id):
+        try:
+            user_profile = Profile.objects.get(uid=user_id)
+            coins = Coin.objects.filter(holder=user_profile)
+
+            if not coins:
+                return JsonResponse(
+                    {"success": True, "info": "No coins found for the user"}
+                )
+
+            coins_info = []
+            for coin in coins:
+                coin_info = {
+                    "coin": coin.name,
+                    "holder": coin.holder.username,
+                    "symbol": coin.symbol,
+                    "wallet_address": [
+                        wallet.address for wallet in coin.wallet_addresses.all()
+                    ],
+                }
+                coins_info.append(coin_info)
+
+            return JsonResponse({"success": True, "info": coins_info})
+
+        except Profile.DoesNotExist:
+            return JsonResponse({"success": False, "info": "User does not exist"})
+        except Exception as e:
+            logger.warning(str(e))
+            return JsonResponse({"success": False, "info": "Failed to get coins"})
+
+    def add_wallet_address(self, user_id, wallet_address, name, identifier):
+        try:
+            user_profile = Profile.objects.get(uid=user_id)
+
+            if not user_profile:
+                return JsonResponse({"success": False, "info": "User does not exist"})
+
+            user_coin = Coin.objects.get(holder=user_profile, name=name)
+
+            if not user_coin:
+                return JsonResponse({"success": False, "info": "No coins added"})
+
+            if isinstance(wallet_address, list):
+                for address in wallet_address:
+                    wallet_instance, created = WalletAddress.objects.get_or_create(
+                        address=address, holder=user_profile, identifier=identifier
+                    )
+                    user_coin.wallet_addresses.add(wallet_instance)
+
+            elif isinstance(wallet_address, str):
+                wallet_instance, created = WalletAddress.objects.get_or_create(
+                    address=wallet_address, holder=user_profile, identifier=identifier
+                )
+                user_coin.wallet_addresses.add(wallet_instance)
+
+            return JsonResponse({"success": True, "info": "Wallets added"})
+
+        except Profile.DoesNotExist:
+            return JsonResponse({"success": False, "info": "User does not exist"})
+        except Coin.DoesNotExist:
+            return JsonResponse({"success": False, "info": "No coins added"})
+        except Exception as e:
+            logger.warning(str(e))
+            return JsonResponse({"success": False, "info": "Failed to add wallets"})
+
     def check_balance(self, coin, address):
         if coin == "bitcoin":
             api_url = f"https://blockstream.info/api/address/{address}"

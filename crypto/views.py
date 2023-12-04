@@ -106,6 +106,54 @@ def logout_user(request):
 
 
 @csrf_exempt
+@require_POST
+@token_required
+@check_fields(["coin", "user_id"])
+def add_coin(request):
+    try:
+        data = json.loads(request.body)
+        coin = data.get("coin")
+        user_id = data.get("user_id")
+        man = manage.add_coin(user_id, coin)
+        return man
+    except Exception as e:
+        logger.warning(str(e))
+        return JsonResponse({"success": False, "info": "Unable to fetch request data"})
+
+
+@csrf_exempt
+@require_POST
+@token_required
+@check_fields(["address", "user_id", "name"])
+def add_wallet_address(request):
+    try:
+        data = json.loads(request.body)
+        address = data.get("address")
+        user_id = data.get("user_id")
+        name = data.get("name")
+        identifier = data.get("identifier")
+        man = manage.add_wallet_address(user_id, address, name, identifier)
+        return man
+    except Exception as e:
+        logger.warning(str(e))
+        return JsonResponse({"success": False, "info": "Unable to fetch request data"})
+
+
+@require_GET
+@token_required
+@check_fields(["user_id"])
+def get_user_coins(request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get("user_id")
+        coins = manage.get_coins(user_id)
+        return coins
+    except Exception as e:
+        logger.warning(str(e))
+        return JsonResponse({"success": False, "info": "Kindly try again --p2prx2--"})
+
+
+@csrf_exempt
 def get_wallet_transactions(request):
     try:
         data = json.loads(request.body)

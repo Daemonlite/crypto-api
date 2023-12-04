@@ -72,8 +72,10 @@ class Authenticate:
 
         if user.isbanned:
             return JsonResponse({"success": False, "info": "Account banned"})
+
         if user.email_verified:
             return JsonResponse({"success": False, "info": "Email already verified"})
+
         if int(stored_otp) == int(user_entered_otp):
             user.email_verified = True
             user.save(update_fields=["email_verified"])

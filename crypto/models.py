@@ -1,11 +1,6 @@
 from django.db import models
 from crypto.caches import Cache
-from crypto.utils import CoinManager
-from decimal import Decimal
 import uuid
-
-# Create your models here.
-manager = CoinManager()
 
 
 # TODO:update coin model to store mutliple addresses for a single coin
@@ -19,24 +14,28 @@ class Profile(models.Model):
     password = models.CharField(max_length=120, blank=True, null=True)
     isbanned = models.BooleanField(default=False)
     email_verified = models.BooleanField(default=False)
+    first_login = models.DateTimeField()
+    last_login = models.DateTimeField()
+
+    def __str__(self):
+        return str(self.username)
+
+
+class WalletAddress(models.Model):
+    address = models.CharField(max_length=120, blank=True, null=True)
+    user = (models.ForeignKey(Profile, on_delete=models.DO_NOTHING),)
+
+    identifier = models.CharField(max_length=120, blank=True, null=True)
+
+    def __str__(self):
+        return str(self.address)
 
 
 class Coin(models.Model):
-    holder = models.ForeignKey(
-        Profile, on_delete=models.SET_NULL, blank=True, null=True
-    )
+    holder = models.ForeignKey(Profile, on_delete=models.DO_NOTHING)
     name = models.CharField(max_length=120, blank=True, null=True)
-    wallet_address = models.CharField(max_length=3000, blank=True, null=True)
+    wallet_addresses = models.ManyToManyField(WalletAddress, blank=True)
     symbol = models.CharField(max_length=10, blank=True, null=True)
 
     def __str__(self):
         return str(self.name)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        cache = Cache(Coin, "cache_coins")
-        cache.save_values()
-        return super().save(*args, **kwargs)
-
-    def fetch_coins(self):
-        return Cache(Coin, "cache_coins").fetch_values()
