@@ -1,7 +1,10 @@
 from functools import wraps
+import arrow
 from django.http import JsonResponse
 import json
 import logging
+from decouple import config
+import jwt
 
 logger = logging.getLogger(__name__)
 
@@ -37,3 +40,38 @@ def check_fields(required_fields):
         return wrapped_view
 
     return checker
+
+
+def token_required(func):
+    @wraps(func)
+    def wrapper(request, *args, **kwargs):
+        access_token = request.headers.get("Authorization")
+
+        if not access_token:
+            return JsonResponse({"error": "Access token is missing."}, status=401)
+
+        try:
+            decoded_token = jwt.decode(
+                access_token, config("SECRET_KEY"), algorithms=["HS256"]
+            )
+
+            expiration_time = arrow.get(decoded_token["exp"])
+            logger.warning(expiration_time)
+            token_type = decoded_token.get("token_type")
+
+            if token_type not in ["access", "refresh"]:
+                return JsonResponse(
+                    {"error": "Invalid access token passed."}, status=401
+                )
+
+        except jwt.ExpiredSignatureError:
+            return JsonResponse(
+                {"error": "Access token has already expired."}, status=401
+            )
+        except jwt.InvalidTokenError as e:
+            logger.warning("Invalid token:", str(e))
+            return JsonResponse({"error": "Invalid access token."}, status=401)
+
+        return func(request, *args, **kwargs)
+
+    return wrapper

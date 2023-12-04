@@ -100,7 +100,6 @@ class Authenticate:
             user = Profile.objects.create(
                 username=username,
                 email=email,
-                username=username,
                 full_name=full_name,
                 phone_number=phone_number,
                 password=make_password(password),
