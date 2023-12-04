@@ -18,6 +18,7 @@ class Profile(models.Model):
     address = models.CharField(max_length=120, blank=True, null=True)
     password = models.CharField(max_length=120, blank=True, null=True)
     isbanned = models.BooleanField(default=False)
+    email_verified = models.BooleanField(default=False)
 
 
 class Coin(models.Model):

@@ -60,7 +60,7 @@ class CoinManager:
                     {"crypto_balance": crypto_balance, "usd_balance": usd_balance}
                 )
             except requests.exceptions.RequestException as e:
-                print(f"Error checking Ethereum balance: {e}")
+                logger.warning(f"Error checking Ethereum balance: {e}")
                 return None
 
         elif coin == "ripple":
@@ -80,29 +80,13 @@ class CoinManager:
                 )
 
             except requests.exceptions.RequestException as e:
-                print(f"Error checking Litecoin balance: {e}")
+                logger.warning(f"Error checking Litecoin balance: {e}")
                 return None
 
-        elif coin == "litecoin":
-            url = f"https://coinremitter.com/api/v3/LTC/get-balance"
+        # TODO:find an api for litecoin
 
-            try:
-                response = requests.get(url)
-                response.raise_for_status()
-
-                data = response.json()
-
-                if data["flag"] == 1:
-                    balance = Decimal(data["data"]["balance"])
-                    return balance.quantize(
-                        Decimal("0.00000000"), rounding=ROUND_HALF_UP
-                    )
-                else:
-                    print(f"Failed to get Litecoin balance. Message: {data['msg']}")
-                    return None
-            except requests.exceptions.RequestException as e:
-                print(f"Error checking Litecoin balance: {e}")
-                return None
+        else:
+            return JsonResponse({"success": False, "info": "Coin not supported"})
 
     def get_coin_price(self, coin):
         try:
@@ -253,7 +237,11 @@ class CoinManager:
                                 addr = transaction["from"]
                             else:
                                 addr = transaction["to"]
-                            usd = self.calculate_usd_value(amount_eth, "ethereum")
+
+                            crypto = amount_eth.quantize(
+                                Decimal("0.00000000"), rounding=ROUND_HALF_UP
+                            )
+                            usd = self.calculate_usd_value(crypto, "ethereum")
                             timestamp = int(transaction["timeStamp"])
                             date_object = datetime.utcfromtimestamp(timestamp)
 
@@ -261,9 +249,7 @@ class CoinManager:
                                 "tx_id": tx_id,
                                 "type": sent_or_received,
                                 "address": addr,
-                                "amount_eth": amount_eth.quantize(
-                                    Decimal("0.00000000"), rounding=ROUND_HALF_UP
-                                ),
+                                "amount_eth": crypto,
                                 "amount_usd": usd,
                                 "date": date_object.date(),
                             }
