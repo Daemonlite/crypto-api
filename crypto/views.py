@@ -73,6 +73,19 @@ def verify_email(request):
         return JsonResponse({"success": False, "info": "Kindly try again --p2prx2--"})
 
 
+@check_fields(["email"])
+@csrf_exempt
+@require_POST
+def resend_otp(request):
+    try:
+        data = json.loads(request.body)
+        email = data.get("email")
+        return auth.resend_otp(email)
+    except Exception as e:
+        logger.warning(str(e))
+        return JsonResponse({"success": False, "info": "Kindly try again --p2prx2--"})
+
+
 @token_required
 @require_GET
 def get_profiles(request):

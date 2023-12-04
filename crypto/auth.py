@@ -34,16 +34,13 @@ class Authenticate:
         return random.randint(10000, 99999)
 
     # TODO: set expiry for token
-    def send_otp(self, recipient):
+    def send_otp(self, recipient, username):
         try:
             otp = self.generate_otp()
             context = {
                 "email": recipient,
                 "template": "otp-verification",
-                "context": dict(
-                    email=recipient,
-                    otp=otp,
-                ),
+                "context": dict(email=recipient, otp=otp, user=username),
             }
             cache.set(f"{recipient}", otp)
             notify.send_sms_or_email(
@@ -56,23 +53,59 @@ class Authenticate:
                 {"success": False, "info": "Error sending OTP via email"}
             )
 
+    def resend_otp(self, email):
+        otp = self.generate_otp()
+        context = {
+            "email": email,
+            "template": "otp-verification",
+            "context": dict(email=email, otp=otp),
+        }
+        cache.set(f"{email}", otp)
+        notify.send_sms_or_email(medium="email", recipient=email, context=context)
+        return JsonResponse({"success": True, "info": "OTP sent successfully"})
+
     def verify_otp(self, email, user_entered_otp):
-        stored_otp = cache.get(f"{email}")
+        stored_otp = cache.get(f"{email}", 0)
+        retries = cache.get(f"retries:{email}", 0)
         logger.warning(stored_otp)
-        if stored_otp:
-            if int(stored_otp) == int(user_entered_otp):
+        user = Profile.objects.get(email=email)
+
+        if user.isbanned:
+            return JsonResponse({"success": False, "info": "Account banned"})
+        if user.email_verified:
+            return JsonResponse({"success": False, "info": "Email already verified"})
+        if int(stored_otp) == int(user_entered_otp):
+            user.email_verified = True
+            user.save(update_fields=["email_verified"])
+            cache.delete(f"{email}")
+            cache.delete(f"retries:{email}")  # Reset retries
+            return JsonResponse(
+                {"success": True, "info": "Email verified successfully"}
+            )
+
+        else:
+            retries += 1
+            cache.set(f"retries:{email}", retries)
+            if retries >= 4:
+                # Ban the account
+                logger.warning("max retries reached")
                 user = Profile.objects.get(email=email)
                 if user:
-                    user.email_verified = True
-                    user.save(update_fields=["email_verified"])
-                    cache.delete(f"{email}")
-                    return JsonResponse(
-                        {"success": True, "info": "Email verified successfully"}
+                    user.isbanned = True
+                    user.save(update_fields=["isbanned"])
+                    context = {
+                        "email": email,
+                        "template": "banned",
+                        "context": dict(
+                            email=email,
+                        ),
+                    }
+                    notify.send_sms_or_email(
+                        medium="email", recipient=email, context=context
                     )
-
+                return JsonResponse({"success": False, "info": "Account banned"})
             else:
                 return JsonResponse({"success": False, "info": "Invalid OTP"})
-        return JsonResponse({"success": False, "info": "OTP expired"})
 
     def register_user(
         self, username, email, full_name, user_name, phone_number, password
@@ -97,15 +130,20 @@ class Authenticate:
                     {"success": False, "info": "Username already exists"}
                 )
 
+            if Profile.objects.filter(phone=phone_number):
+                return JsonResponse(
+                    {"success": False, "info": "Phone number already exists"}
+                )
+
             user = Profile.objects.create(
                 username=username,
                 email=email,
                 full_name=full_name,
-                phone_number=phone_number,
+                phone=phone_number,
                 password=make_password(password),
             )
             if user:
-                self.send_otp(user.email)
+                self.send_otp(user.email, user.username)
                 return JsonResponse(
                     {"success": True, "info": "User created successfully"}
                 )
