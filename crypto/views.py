@@ -181,3 +181,20 @@ def get_wallet_transactions(request):
     except Exception as e:
         logger.warning(str(e))
         return JsonResponse({"success": False, "info": "Unable to fetch request data"})
+
+
+@require_GET
+@token_required
+@check_fields(["user_id", "coin", "identifier"])
+def check_balance(request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get("user_id")
+        coin = data.get("coin")
+        identifier = data.get("identifier")
+
+        bal = manage.user_wallet_balance(user_id, coin, identifier)
+        return bal
+    except Exception as e:
+        logger.warning(str(e))
+        return JsonResponse({"success": False, "info": "Kindly try again --p2prx2--"})

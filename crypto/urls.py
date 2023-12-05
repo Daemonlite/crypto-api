@@ -13,4 +13,5 @@ urlpatterns = [
     path("add_coin/", views.add_coin),
     path("get_user_coins/", views.get_user_coins),
     path("user_address_by_id/", views.fetch_address_identifier),
+    path("check_balance/", views.check_balance),
 ]

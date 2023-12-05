@@ -60,7 +60,9 @@ class CoinManager:
         try:
             coins = Coin.objects.select_related("holder").filter(holder=user_profile)
         except ObjectDoesNotExist:
-            return JsonResponse({"success": True, "info": "No coins found for the user"})
+            return JsonResponse(
+                {"success": True, "info": "No coins found for the user"}
+            )
 
         coins_info = []
         for coin in coins:
@@ -150,17 +152,15 @@ class CoinManager:
         return JsonResponse({"success": True, "info": wallet_list})
 
     def check_balance(self, coin, address):
-        if coin == "bitcoin" or coin == 'btc':
-            api_url = f"https://blockstream.info/api/address/{address}"
+        if coin == "bitcoin" or coin == "btc":
+            api_url = f"https://api.blockcypher.com/v1/btc/main/addrs/{address}/balance"
 
             try:
                 response = requests.get(api_url)
                 response.raise_for_status()
 
                 data = response.json()
-                balance = (
-                    data["chain_stats"]["funded_txo_sum"] / 10**8
-                )  # Convert satoshis to BTC
+                balance = data["balance"] / 10**8  # Convert satoshis to BTC
                 usd_balance = self.calculate_usd_value(balance, "bitcoin")
 
                 if balance and usd_balance:
@@ -186,10 +186,10 @@ class CoinManager:
                     Decimal("0.00000000"), rounding=ROUND_HALF_UP
                 )
                 usd_balance = self.calculate_usd_value(crypto_balance, "ethereum")
-
-                return JsonResponse(
-                    {"crypto_balance": crypto_balance, "usd_balance": usd_balance}
-                )
+                if crypto_balance and usd_balance:
+                    return JsonResponse(
+                        {"crypto_balance": crypto_balance, "usd_balance": usd_balance}
+                    )
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Error checking Ethereum balance: {e}")
                 return None
@@ -233,6 +233,34 @@ class CoinManager:
             return JsonResponse(
                 {"success": False, "info": "Failed to get exchange rate"}
             )
+
+    def user_wallet_balance(self, user_id, coin, identifier):
+        try:
+            user = Profile.objects.get(uid=user_id)
+            if not user:
+                return JsonResponse({"success": False, "info": "User does not exist"})
+
+            add = self.get_user_wallet(user_id, identifier, coin)
+            addr = json.loads(add.content)
+            logger.warning(addr)
+
+            addresses = addr["info"]
+            if len(addresses) == 0:
+                return JsonResponse({"success": False, "info": "No addresses found"})
+
+            address = addresses[0]["address"]
+            logger.warning(address)
+
+            balance = self.check_balance(coin, address)
+            logger.warning(balance)
+            if balance is not None:
+                return JsonResponse(
+                    {"success": True, "info": json.loads(balance.content)}
+                )
+            else:
+                return JsonResponse({"success": True, "info": 0})
+        except Exception as e:
+            return JsonResponse({"success": False, "info": str(e)})
 
     def convert_currency(self, to, amount):
         url = f"https://api.apilayer.com/fixer/convert?to={to}&from=USD&amount={amount}"
