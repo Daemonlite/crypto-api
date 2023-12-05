@@ -4,8 +4,9 @@ from datetime import datetime
 from decouple import config
 import json
 from django.http import JsonResponse
+from django.core.exceptions import ObjectDoesNotExist
 import requests
-from crypto.models import Coin, Profile, WalletAddress
+from crypto.models import Coin, Profile, Wallet
 import logging
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class CoinManager:
     def get_coins(self, user_id):
         try:
             user_profile = Profile.objects.get(uid=user_id)
-            coins = Coin.objects.filter(holder=user_profile)
+            coins = Coin.objects.select_related("holder").filter(holder=user_profile)
 
             if not coins:
                 return JsonResponse(
@@ -92,15 +93,15 @@ class CoinManager:
             if not user_coin:
                 return JsonResponse({"success": False, "info": "No coins added"})
 
-            if isinstance(wallet_address, list):
-                for address in wallet_address:
-                    wallet_instance, created = WalletAddress.objects.get_or_create(
-                        address=address, holder=user_profile, identifier=identifier
-                    )
-                    user_coin.wallet_addresses.add(wallet_instance)
+            # if isinstance(wallet_address, list):
+            #     for address in wallet_address:
+            #         wallet_instance, created = Wallet.objects.get_or_create(
+            #             address=address, holder=user_profile, identifier=identifier
+            #         )
+            #         user_coin.wallet_addresses.add(wallet_instance)
 
-            elif isinstance(wallet_address, str):
-                wallet_instance, created = WalletAddress.objects.get_or_create(
+            if isinstance(wallet_address, str):
+                wallet_instance, created = Wallet.objects.get_or_create(
                     address=wallet_address, holder=user_profile, identifier=identifier
                 )
                 user_coin.wallet_addresses.add(wallet_instance)
@@ -115,8 +116,45 @@ class CoinManager:
             logger.warning(str(e))
             return JsonResponse({"success": False, "info": "Failed to add wallets"})
 
+    def get_user_wallet(self, user_id, identifier, coin_name):
+        try:
+            user = Profile.objects.get(uid=user_id)
+        except ObjectDoesNotExist:
+            return JsonResponse({"success": False, "info": "User does not exist"})
+
+        try:
+            coin = Coin.objects.get(holder=user, name=coin_name)
+        except ObjectDoesNotExist:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "info": f"Coin with name {coin_name} not found for the user",
+                }
+            )
+
+        wallets = coin.wallet_addresses.filter(identifier=identifier)
+
+        if not wallets:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "info": "No wallets found for the specified coin and identifier",
+                }
+            )
+
+        wallet_list = [
+            {
+                "address": wallet.address,
+                "identifier": wallet.identifier,
+                "coin": coin.name,
+            }
+            for wallet in wallets
+        ]
+
+        return JsonResponse({"success": True, "info": wallet_list})
+
     def check_balance(self, coin, address):
-        if coin == "bitcoin":
+        if coin == "bitcoin" or coin == 'btc':
             api_url = f"https://blockstream.info/api/address/{address}"
 
             try:
@@ -137,7 +175,7 @@ class CoinManager:
                 logger.warning(f"Error: {str(e)}")
                 return JsonResponse({"success": False, "info": "Failed to get balance"})
 
-        elif coin == "ethereum":
+        elif coin == "ethereum" or coin == "eth":
             ETHERSCAN_API_KEY = config("ETHERSCAN_API_KEY")
             api_url = f"https://api.etherscan.io/api?module=account&action=balance&address={address}&apikey={ETHERSCAN_API_KEY}"
 
@@ -160,7 +198,7 @@ class CoinManager:
                 logger.warning(f"Error checking Ethereum balance: {e}")
                 return None
 
-        elif coin == "ripple":
+        elif coin == "ripple" or coin == "xrp":
             url = f"https://api.tatum.io/v3/xrp/account/{address}/balance/"
 
             try:

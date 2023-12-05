@@ -1,5 +1,5 @@
 from django.contrib import admin
-from crypto.models import Coin, Profile, WalletAddress
+from crypto.models import Coin, Profile, Wallet
 
 # Register your models here.
 
@@ -16,7 +16,7 @@ class ProfileAdmin(admin.ModelAdmin):
     search_fields = ["username", "first_name", "last_name"]
 
 
-@admin.register(WalletAddress)
+@admin.register(Wallet)
 class WalletAddressAdmin(admin.ModelAdmin):
-    list_display = tuple(field.name for field in WalletAddress._meta.fields)
+    list_display = tuple(field.name for field in Wallet._meta.fields)
     search_fields = ["address"]

@@ -141,6 +141,22 @@ def add_wallet_address(request):
 
 @require_GET
 @token_required
+@check_fields(["user_id", "identifier", "coin_name"])
+def fetch_address_identifier(request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get("user_id")
+        identifier = data.get("identifier")
+        coin_name = data.get("coin_name")
+        man = manage.get_user_wallet(user_id, identifier, coin_name)
+        return man
+    except Exception as e:
+        logger.warning(str(e))
+        return JsonResponse({"success": False, "info": "Kindly try again --p2prx2--"})
+
+
+@require_GET
+@token_required
 @check_fields(["user_id"])
 def get_user_coins(request):
     try:

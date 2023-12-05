@@ -21,10 +21,9 @@ class Profile(models.Model):
         return str(self.username)
 
 
-class WalletAddress(models.Model):
+class Wallet(models.Model):
     address = models.CharField(max_length=120, blank=True, null=True)
-    user = (models.ForeignKey(Profile, on_delete=models.DO_NOTHING),)
-
+    holder = models.ForeignKey(Profile, on_delete=models.DO_NOTHING)
     identifier = models.CharField(max_length=120, blank=True, null=True)
 
     def __str__(self):
@@ -34,7 +33,7 @@ class WalletAddress(models.Model):
 class Coin(models.Model):
     holder = models.ForeignKey(Profile, on_delete=models.DO_NOTHING)
     name = models.CharField(max_length=120, blank=True, null=True)
-    wallet_addresses = models.ManyToManyField(WalletAddress, blank=True)
+    wallet_addresses = models.ManyToManyField(Wallet, blank=True)
     symbol = models.CharField(max_length=10, blank=True, null=True)
 
     def __str__(self):
