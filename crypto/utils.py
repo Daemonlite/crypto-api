@@ -54,32 +54,28 @@ class CoinManager:
     def get_coins(self, user_id):
         try:
             user_profile = Profile.objects.get(uid=user_id)
-            coins = Coin.objects.select_related("holder").filter(holder=user_profile)
-
-            if not coins:
-                return JsonResponse(
-                    {"success": True, "info": "No coins found for the user"}
-                )
-
-            coins_info = []
-            for coin in coins:
-                coin_info = {
-                    "coin": coin.name,
-                    "holder": coin.holder.username,
-                    "symbol": coin.symbol,
-                    "wallet_address": [
-                        wallet.address for wallet in coin.wallet_addresses.all()
-                    ],
-                }
-                coins_info.append(coin_info)
-
-            return JsonResponse({"success": True, "info": coins_info})
-
-        except Profile.DoesNotExist:
+        except ObjectDoesNotExist:
             return JsonResponse({"success": False, "info": "User does not exist"})
-        except Exception as e:
-            logger.warning(str(e))
-            return JsonResponse({"success": False, "info": "Failed to get coins"})
+
+        try:
+            coins = Coin.objects.select_related("holder").filter(holder=user_profile)
+        except ObjectDoesNotExist:
+            return JsonResponse({"success": True, "info": "No coins found for the user"})
+
+        coins_info = []
+        for coin in coins:
+            coin_info = {
+                "coin": coin.name,
+                "holder": coin.holder.username,
+                "symbol": coin.symbol,
+                "wallet_addresses": [
+                    {"address": wallet.address, "identifier": wallet.identifier}
+                    for wallet in coin.wallet_addresses.all()
+                ],
+            }
+            coins_info.append(coin_info)
+
+        return JsonResponse({"success": True, "info": coins_info})
 
     def add_wallet_address(self, user_id, wallet_address, name, identifier):
         try:
