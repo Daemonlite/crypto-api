@@ -262,6 +262,34 @@ class CoinManager:
         except Exception as e:
             return JsonResponse({"success": False, "info": str(e)})
 
+    # TODO: as above create a method for checking user wallet transactions
+    def get_user_wallet_transactions(self, user_id, coin, identifier):
+        try:
+            user = Profile.objects.get(uid=user_id)
+            if not user:
+                return JsonResponse({"success": False, "info": "User does not exist"})
+
+            coins = Coin.objects.get(holder=user, name=coin)
+            if not coins:
+                return JsonResponse({"success": False, "info": "Coin not found"})
+
+            wallet = self.get_user_wallet(user_id, identifier, coin)
+            if not wallet:
+                return JsonResponse({"success": False, "info": "Wallet not found"})
+
+            wall = json.loads(wallet.content)
+            wallets = wall["info"][0]["address"]
+            logger.warning(wallets)
+
+            transact = self.transaction_checker(coins.name, wallets)
+            transaction = json.loads(transact.content)
+
+            return JsonResponse({"success": True, "info": transaction})
+
+        except Exception as e:
+            logger.warning(str(e))
+            return JsonResponse({"success": False, "info": "An error ocurred"})
+
     def convert_currency(self, to, amount):
         url = f"https://api.apilayer.com/fixer/convert?to={to}&from=USD&amount={amount}"
         payload = {}

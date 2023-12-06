@@ -198,3 +198,20 @@ def check_balance(request):
     except Exception as e:
         logger.warning(str(e))
         return JsonResponse({"success": False, "info": "Kindly try again --p2prx2--"})
+
+
+@require_GET
+@token_required
+@check_fields(["coin", "user_id", "identifier"])
+def check_transactions(request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get("user_id")
+        coin = data.get("coin")
+        identifier = data.get("identifier")
+        transact = manage.get_user_wallet_transactions(user_id, coin, identifier)
+        return transact
+
+    except Exception as e:
+        logger.warning(str(e))
+        return JsonResponse({"success": False, "info": "Kindly try again --p2prx2--"})
