@@ -26,7 +26,10 @@ SECRET_KEY = "django-insecure-wn9r@0y&fy9^$q6h*ujyqc$9o3x$)iy9m^f132cz76awvk(odn
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'http://localhost:5173/',
+    '127.0.0.1'
+]
 
 
 # Application definition
@@ -40,11 +43,13 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "crypto.apps.CryptoConfig",
     "post_office",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    'corsheaders.middleware.CorsMiddleware',
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -131,6 +136,13 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Correct: Path is removed
+]
+
 
 
 EMAIL_USE_TLS = True

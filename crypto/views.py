@@ -32,7 +32,7 @@ def register_user(request):
         phone_number = data.get("phone_number")
         password = data.get("password")
         reg = auth.register_user(
-            username, email, full_name, username, phone_number, password
+            username, email, full_name, phone_number, password
         )
         return reg
     except Exception as e:

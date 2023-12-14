@@ -110,10 +110,10 @@ class Authenticate:
                 return JsonResponse({"success": False, "info": "Invalid OTP"})
 
     def register_user(
-        self, username, email, full_name, user_name, phone_number, password
+        self, username, email, full_name, phone_number, password
     ):
         try:
-            if len(username) < 4 or len(full_name) < 4 or len(user_name) < 4:
+            if len(username) < 4 or len(full_name) < 4 or len(username) < 4:
                 return JsonResponse({"success": False, "info": "input  too short"})
 
             if len(password) < 8:
@@ -143,6 +143,7 @@ class Authenticate:
                 full_name=full_name,
                 phone=phone_number,
                 password=make_password(password),
+                first_login = arrow.now().datetime
             )
             if user:
                 self.send_otp(user.email, user.username)

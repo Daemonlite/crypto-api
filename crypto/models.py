@@ -1,6 +1,7 @@
 from django.db import models
 from crypto.caches import Cache
 import uuid
+from django.utils import timezone
 
 
 # TODO:update coin model to store mutliple addresses for a single coin
@@ -14,8 +15,8 @@ class Profile(models.Model):
     password = models.CharField(max_length=120, blank=True, null=True)
     isbanned = models.BooleanField(default=False)
     email_verified = models.BooleanField(default=False)
-    first_login = models.DateTimeField()
-    last_login = models.DateTimeField()
+    first_login = models.DateTimeField(null=True)
+    last_login = models.DateTimeField(null=True)
 
     def __str__(self):
         return str(self.username)

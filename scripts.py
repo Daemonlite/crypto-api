@@ -22,5 +22,3 @@ ltc = "ltc1qv7wsvsmx6tqxjz9l750n0pj524na4lmqrjhyz9"
 xrp = "rBURNERRhpAM8ygERz7GsXrHRjJrngBLi2"
 
 
-mn = 1727574 / 10**8
-print(mn)
